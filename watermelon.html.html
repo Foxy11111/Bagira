@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Watermelon Sorter: a / an</title>
+  <style>
+    :root{
+      --sky:#7dd3fc;          /* light sky blue */
+      --sea:#22d3ee;          /* cyan */
+      --sand:#fde68a;         /* sand */
+      --leaf:#10b981;         /* emerald */
+      --leaf-dark:#059669;    
+      --rind:#34d399;         /* light rind */
+      --rind-dark:#15803d;    /* dark rind */
+      --pulp:#ff5c8a;         /* watermelon pulp */
+      --pulp-dark:#ff2e63;    
+      --seed:#111827;         /* near-black */
+      --white:#fff;
+      --shadow:0 10px 30px rgba(0,0,0,.15);
+      --shadow-soft:0 6px 18px rgba(0,0,0,.10);
+      --ok:#22c55e;
+      --bad:#ef4444;
+      --text:#0f172a;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, "Inter", sans-serif; color:var(--text);
+      background: linear-gradient(180deg, var(--sky) 0%, var(--sea) 45%, var(--sand) 100%);
+      background-attachment: fixed;
+    }
+
+    header{
+      display:flex; align-items:center; justify-content:space-between; gap:1rem;
+      padding: 18px clamp(16px, 5vw, 42px);
+    }
+
+    .title{
+      display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:.2px;
+    }
+    .title .logo{ width:44px; height:44px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.1)); }
+    .title h1{ font-size: clamp(20px, 3.6vw, 36px); margin:0; }
+    .subtitle{ opacity:.8; font-weight:500; font-size: clamp(12px, 2vw, 14px);}    
+
+    .panel{
+      margin-inline: clamp(12px, 4vw, 48px);
+      background: rgba(255,255,255,.6);
+      backdrop-filter: blur(6px);
+      border: 2px solid rgba(255,255,255,.8);
+      box-shadow: var(--shadow);
+      border-radius: 20px;
+      padding: clamp(12px, 3vw, 24px);
+    }
+
+    .stats{
+      display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px;
+      font-weight:600;
+    }
+    .pill{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background: var(--white); box-shadow: var(--shadow-soft);}
+    .pill b{font-weight:800}
+    .btn{
+      cursor:pointer; border:none; border-radius:12px; padding:10px 14px; font-weight:700; letter-spacing:.3px;
+      background: linear-gradient(135deg, var(--leaf) 0%, var(--leaf-dark) 100%); color:white; box-shadow: var(--shadow-soft);
+      transition: transform .08s ease, box-shadow .2s ease; 
+    }
+    .btn:hover{ transform: translateY(-1px);} 
+    .btn.secondary{ background: linear-gradient(135deg, #f97316, #ea580c); }
+
+    .game{
+      display:grid; grid-template-columns: 1.05fr .95fr; gap: clamp(14px, 4vw, 28px);
+      margin-top: 14px;
+    }
+
+    /* Pile (melons grid) */
+    .pile{
+      min-height: 360px;
+      background: rgba(255,255,255,.6);
+      border: 3px dashed rgba(255,255,255,.9);
+      border-radius: 20px; padding: 12px; position: relative; overflow:hidden;
+    }
+    .pile-title{ font-weight:800; opacity:.8; margin: 4px 8px 8px; }
+    .melons{
+      display:grid; grid-template-columns: repeat(auto-fill, minmax(110px,1fr)); gap: 12px; 
+    }
+
+    /* Drop zones */
+    .zones{ display:flex; flex-direction:column; gap:12px; }
+    .zone{
+      position:relative; min-height: 180px; background: rgba(255,255,255,.65); border-radius: 20px; padding: 14px 14px 18px; box-shadow: var(--shadow-soft);
+      border: 2px solid rgba(255,255,255,.9);
+    }
+    .zone-header{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+    .zone h3{ margin:0; font-size: 20px; letter-spacing:.3px; }
+    .basket{ 
+      position:absolute; inset:auto 12px 12px 12px; top:56px;
+      display:grid; grid-template-columns: repeat(auto-fill, minmax(108px,1fr)); gap: 10px;
+      min-height:120px;
+    }
+    .zone[data-article="a"] h3{color:#0f766e}
+    .zone[data-article="an"] h3{color:#7c2d12}
+
+    /* Melon */
+    .melon{
+      position:relative; width:110px; height:110px; border-radius:999px; cursor:grab; user-select:none;
+      background: radial-gradient(circle at 50% 50%, var(--pulp) 0 54%, var(--pulp-dark) 54% 66%, var(--rind) 67% 76%, var(--rind-dark) 76% 100%);
+      box-shadow: var(--shadow-soft);
+      display:flex; align-items:center; justify-content:center; text-align:center; padding:8px; color:white; font-weight:900; text-shadow: 0 2px 6px rgba(0,0,0,.4);
+      transition: transform .12s ease, box-shadow .2s ease, filter .2s ease; outline: none;
+    }
+    .melon:focus{ box-shadow: 0 0 0 3px rgba(255,255,255,.8), 0 0 0 6px rgba(16,185,129,.6), var(--shadow-soft); }
+    .melon[draggable="true"]:active{ cursor:grabbing; transform: scale(.98); }
+    .melon .word{ font-size: 20px; line-height:1.1; position: relative; z-index: 2; }
+    .melon.small .word{ font-size: 18px; }
+
+    /* seeds */
+    .seed{ position:absolute; width:7px; height:11px; background:var(--seed); border-radius:60% 60% 70% 70%; opacity:.45; filter: drop-shadow(0 1px 1px rgba(0,0,0,.15)); z-index:1; }
+    .seed:nth-child(1){ top:18%; left:28%; transform: rotate(10deg); }
+    .seed:nth-child(2){ top:32%; left:58%; transform: rotate(-18deg); }
+    .seed:nth-child(3){ top:62%; left:38%; transform: rotate(22deg); }
+    .seed:nth-child(4){ top:48%; left:20%; transform: rotate(-6deg); }
+    .seed:nth-child(5){ top:66%; left:64%; transform: rotate(8deg); }
+
+    /* State styles */
+    .melon.correct{ filter: saturate(1.15) brightness(1.05); }
+    .melon.incorrect{ animation: shake .3s linear; }
+    @keyframes shake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+
+    .zone.drag-over{ outline: 3px dashed rgba(0,0,0,.25); outline-offset: -6px; }
+
+    .footer{ display:flex; gap:10px; justify-content:flex-end; padding-top:10px; }
+
+    /* Toast */
+    .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:24px; background:rgba(0,0,0,.8); color:white; padding:10px 14px; border-radius:999px; font-weight:700; letter-spacing:.2px; opacity:0; pointer-events:none; transition:opacity .2s ease; }
+    .toast.show{ opacity:1; }
+
+    /* Completion overlay */
+    .overlay{ position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.35); }
+    .card{ background:white; border-radius:20px; padding:20px 22px; width:min(560px, 92vw); box-shadow: var(--shadow); text-align:center; }
+    .card h2{ margin-top: 8px; margin-bottom:6px; font-size: clamp(22px, 3.2vw, 28px); }
+    .card p{ margin: 8px 0; }
+
+    .confetti{ position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+    .confetti i{ position:absolute; width:10px; height:14px; background: var(--pulp); opacity:.9; transform: translateY(-120vh) rotate(0); animation: fall 2.2s ease-in forwards; }
+    .confetti i:nth-child(odd){ background: var(--leaf); }
+    .confetti i:nth-child(3n){ background: #f59e0b; }
+    @keyframes fall{ to { transform: translateY(120vh) rotate(720deg); } }
+
+    /* Responsive */
+    @media (max-width: 900px){
+      .game{ grid-template-columns: 1fr; }
+      .basket{ grid-template-columns: repeat(auto-fill, minmax(100px,1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title" aria-label="Watermelon Sorter: артикли a/an">
+      <svg class="logo" viewBox="0 0 128 128" aria-hidden="true">
+        <defs>
+          <linearGradient id="g1" x1="0" x2="1">
+            <stop offset="0%" stop-color="#34d399"/>
+            <stop offset="100%" stop-color="#15803d"/>
+          </linearGradient>
+          <linearGradient id="g2" x1="0" x2="1">
+            <stop offset="0%" stop-color="#ff5c8a"/>
+            <stop offset="100%" stop-color="#ff2e63"/>
+          </linearGradient>
+        </defs>
+        <circle cx="64" cy="64" r="60" fill="url(#g1)"/>
+        <circle cx="64" cy="64" r="48" fill="url(#g2)"/>
+        <g fill="#0b1220" opacity=".85">
+          <ellipse cx="44" cy="60" rx="4" ry="7"/>
+          <ellipse cx="64" cy="74" rx="4" ry="7"/>
+          <ellipse cx="84" cy="58" rx="4" ry="7"/>
+        </g>
+      </svg>
+      <div>
+        <h1>Арбузный сортер: <span style="color:#0f766e">a</span>/<span style="color:#7c2d12">an</span></h1>
+        <div class="subtitle">Drag the melon with the word into the correct basket: <b>a</b> or <b>an</b>.</div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="resetBtn" title="Начать заново">Reset</button>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="stats" role="status" aria-live="polite">
+      <div class="pill">Completed: <b id="doneCount">0</b>/20</div>
+      <div class="pill">Mistakes: <b id="mistakeCount">0</b></div>
+      <div class="pill">Time: <b id="timer">00:00</b></div>
+      <div class="pill">Hotkeys: <b>A</b> → basket <b>a</b>, <b>N</b> → basket <b>an</b></div>
+    </div>
+
+    <div class="game" id="game">
+      <section class="pile" aria-label="Melon pile">
+        <div class="pile-title">Click and drag melons ⤵</div>
+        <div class="melons" id="melons"></div>
+      </section>
+
+      <section class="zones" aria-label="Sorting zones">
+        <div class="zone" data-article="a" aria-label="Basket for article a" tabindex="0">
+          <div class="zone-header">
+            <h3>Basket 'a'</h3>
+            <span class="subtitle">E.g.: a cat, a book</span>
+          </div>
+          <div class="basket" id="basketA" aria-live="polite"></div>
+        </div>
+        <div class="zone" data-article="an" aria-label="Basket for article an" tabindex="0">
+          <div class="zone-header">
+            <h3>Basket 'an'</h3>
+            <span class="subtitle">E.g.: an apple, an egg</span>
+          </div>
+          <div class="basket" id="basketAn" aria-live="polite"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">
+      <button class="btn secondary" id="showAll">Reveal answers</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <div class="confetti" id="confetti"></div>
+    <div class="card">
+      <h2>Great! All melons sorted 🎉</h2>
+      <p>Time: <b id="finalTime">00:00</b> · Ошибок: <b id="finalMistakes">0</b></p>
+      <button class="btn" id="againBtn">Play again</button>
+    </div>
+  </div>
+
+  <script>
+    // ---------- DATA ----------
+    const DATA = [
+      {word:'apple', article:'an'},
+      {word:'orange', article:'an'},
+      {word:'watermelon', article:'a'},
+      {word:'cat', article:'a'},
+      {word:'elephant', article:'an'},
+      {word:'ice cream', article:'an'},
+      {word:'dog', article:'a'},
+      {word:'house', article:'a'},
+      {word:'onion', article:'an'},
+      {word:'egg', article:'an'},
+      {word:'pen', article:'a'},
+      {word:'book', article:'a'},
+      {word:'ant', article:'an'},
+      {word:'fish', article:'a'},
+      {word:'umbrella', article:'an'},
+      {word:'star', article:'a'},
+      {word:'owl', article:'an'},
+      {word:'car', article:'a'},
+      {word:'island', article:'an'},
+      {word:'horse', article:'a'}
+    ];
+
+    // ---------- STATE ----------
+    let done = 0; let mistakes = 0; let startTs = null; let timerId = null;
+
+    // ---------- HELPERS ----------
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+    const shuffle = arr => arr.map(v=>[Math.random(), v]).sort((a,b)=>a[0]-b[0]).map(v=>v[1]);
+
+    function formatTime(ms){
+      const s = Math.floor(ms/1000); const m = Math.floor(s/60); const r = s % 60; 
+      return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`;
+    }
+
+    function toast(msg){
+      const el = $('#toast'); el.textContent = msg; el.classList.add('show');
+      setTimeout(()=> el.classList.remove('show'), 1100);
+    }
+
+    function startTimer(){
+      startTs = Date.now();
+      clearInterval(timerId);
+      timerId = setInterval(()=>{ $('#timer').textContent = formatTime(Date.now()-startTs); }, 250);
+    }
+
+    function stopTimer(){ clearInterval(timerId); }
+
+    function updateCounters(){
+      $('#doneCount').textContent = done; $('#mistakeCount').textContent = mistakes;
+    }
+
+    function makeSeed(){
+      const s = document.createElement('span'); s.className = 'seed'; return s; 
+    }
+
+    function createMelon(item, idx){
+      const m = document.createElement('button');
+      m.className = 'melon';
+      m.setAttribute('draggable','true');
+      m.setAttribute('data-article', item.article);
+      m.setAttribute('data-word', item.word);
+      m.setAttribute('aria-label', `Word: ${item.word}. Drag to basket a or an`);
+
+      // Length-based font sizing
+      if(item.word.length > 8) m.classList.add('small');
+
+      const word = document.createElement('span'); word.className = 'word'; word.textContent = item.word; m.appendChild(word);
+
+      // Seeds for vibe ✨
+      m.appendChild(makeSeed()); m.appendChild(makeSeed()); m.appendChild(makeSeed()); m.appendChild(makeSeed()); m.appendChild(makeSeed());
+
+      // Drag events
+      m.addEventListener('dragstart', ev => {
+        ev.dataTransfer.setData('text/plain', JSON.stringify({word:item.word, article:item.article}));
+        ev.dataTransfer.effectAllowed = 'move';
+      });
+
+      // Keyboard support
+      m.addEventListener('keydown', ev => {
+        if(ev.key.toLowerCase() === 'a') { ev.preventDefault(); attemptPlace(m, 'a'); }
+        if(ev.key.toLowerCase() === 'n') { ev.preventDefault(); attemptPlace(m, 'an'); }
+      });
+
+      return m;
+    }
+
+    function attachZoneDnD(zone){
+      zone.addEventListener('dragover', ev => { ev.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', ev => {
+        ev.preventDefault(); zone.classList.remove('drag-over');
+        try{
+          const payload = JSON.parse(ev.dataTransfer.getData('text/plain'));
+          const melon = $(`.melon[data-word="${CSS.escape(payload.word)}"]`);
+          if(melon) attemptPlace(melon, zone.dataset.article);
+        }catch(e){ /* ignore */ }
+      });
+    }
+
+    function attemptPlace(melon, targetArticle){
+      if(!melon || melon.classList.contains('correct')) return;
+      const word = melon.dataset.word; const correct = melon.dataset.article;
+      const zone = targetArticle === 'a' ? $('#basketA') : $('#basketAn');
+      if(targetArticle === correct){
+        // Success
+        zone.appendChild(melon);
+        melon.classList.add('correct');
+        melon.setAttribute('draggable','false');
+        melon.style.cursor = 'default';
+        melon.querySelector('.word').textContent = `${targetArticle} ${word}`;
+        melon.setAttribute('aria-label', `Correct: ${targetArticle} ${word}`);
+        done++; updateCounters();
+        if(done === DATA.length) finish();
+      }else{
+        // Fail
+        melon.classList.remove('incorrect');
+        void melon.offsetWidth; // reflow to restart animation
+        melon.classList.add('incorrect');
+        mistakes++; updateCounters();
+        toast('Not yet — try again!');
+      }
+    }
+
+    function finish(){
+      stopTimer();
+      $('#finalTime').textContent = $('#timer').textContent;
+      $('#finalMistakes').textContent = mistakes;
+      const overlay = $('#overlay');
+      overlay.style.display = 'grid'; overlay.setAttribute('aria-hidden','false');
+      // Confetti
+      const c = $('#confetti'); c.innerHTML='';
+      for(let i=0;i<120;i++){
+        const piece = document.createElement('i');
+        piece.style.left = Math.random()*100 + 'vw';
+        piece.style.opacity = .6 + Math.random()*.4;
+        piece.style.width = (8 + Math.random()*8) + 'px';
+        piece.style.height = (10 + Math.random()*16) + 'px';
+        piece.style.animationDelay = (Math.random()*0.7)+'s';
+        c.appendChild(piece);
+      }
+    }
+
+    function build(){
+      // Reset state
+      done = 0; mistakes = 0; updateCounters();
+      $('#timer').textContent = '00:00';
+      $('#overlay').style.display = 'none'; $('#overlay').setAttribute('aria-hidden','true');
+      $('#confetti').innerHTML='';
+
+      // Render melons
+      const root = $('#melons'); root.innerHTML='';
+      const list = shuffle([...DATA]);
+      list.forEach((item, idx) => root.appendChild(createMelon(item, idx)));
+
+      // Clear baskets
+      $('#basketA').innerHTML='';
+      $('#basketAn').innerHTML='';
+
+      startTimer();
+    }
+
+    // ---------- INIT ----------
+    attachZoneDnD($('[data-article="a"]'));
+    attachZoneDnD($('[data-article="an"]'));
+
+    $('#resetBtn').addEventListener('click', build);
+    $('#againBtn').addEventListener('click', build);
+    $('#showAll').addEventListener('click', () => {
+      // auto-place remaining correctly
+      $$('.melon:not(.correct)').forEach(m => attemptPlace(m, m.dataset.article));
+    });
+
+    build();
+  </script>
+</body>
+</html>
